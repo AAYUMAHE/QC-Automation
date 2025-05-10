@@ -2,3 +2,4 @@
 *.txt
 *.jpg
 venv
+*.ipynb
