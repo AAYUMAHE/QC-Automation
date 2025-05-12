@@ -7,14 +7,42 @@ import re
 import csv
 
 
+
+# ============== to accept the arguments from the terminal ======
+import argparse
+
+parser = argparse.ArgumentParser(description="QC Automation for Certificate Validation")
+parser.add_argument(
+    "--certificate_excel",
+    type=str,
+    required=True,
+    help="Path to the original certificate Excel/CSV file"
+)
+parser.add_argument(
+    "--folder_path",
+    type=str,
+    required=True,
+    help="Path to the folder containing certificate images"
+)
+
+args = parser.parse_args()
+
+certificate_excel = args.certificate_excel
+folder_path = args.folder_path
+
+
+# ========================================
+
+
+
 # This is the mail file 
 
-certificate_excel = "./icmai_certificate_data.csv"     #Path to original excel sheet .
-# name , email , secret  , course , unique_number , reg_no , date , type , duration
+# certificate_excel = "./icmai_certificate_data.csv"     #Path to original excel sheet .
+# # name , email , secret  , course , unique_number , reg_no , date , type , duration
 
-folder_path = "./certificates"   # Update this to your certificate folder path
+# folder_path = "./certificates"   # Update this to your certificate folder path
 
-output_folder = "./manual_check_needed"
+output_folder = "./manual_check_needed"    #static , don't tpuch it . 
 
 # Create output folder if it doesn't exist
 os.makedirs(output_folder, exist_ok=True)
@@ -241,22 +269,26 @@ new_df.to_csv('merged_output.csv', index=False)
             # ==============================================================================
 
 
-# Step 1: Extract unique IDs from the file (comma-separated text, all as one string)
+import os
+import shutil
+
+# Define your paths
+# merged_csv_path = "merged_output.csv"    #is is static.
+# folder_path = "path/to/input/folder"
+# output_folder = "path/to/output/folder"
+
+# Step 1: Read one ID per line
 unique_ids = set()
-
 with open("merged_output.csv", "r") as file:
-    content = file.read()
+    for line in file:
+        cleaned = line.strip()
+        if cleaned and cleaned.lower() != 'combined_column':  # Skip header if present
+            unique_ids.add(cleaned.lower())
 
-for item in content.split(','):
-
-    cleaned = item.strip()
-    if cleaned:
-        unique_ids.add(cleaned.lower())
-
-# Step 2: Prepare destination folder
+# Step 2: Ensure output folder exists
 os.makedirs(output_folder, exist_ok=True)
 
-# Step 3: Match and move files
+# Step 3: Move matching .jpg files
 moved_files = 0
 
 for filename in os.listdir(folder_path):
@@ -272,4 +304,4 @@ for filename in os.listdir(folder_path):
             shutil.move(filepath, dst)
             moved_files += 1
 
-print(f" Done. {moved_files} certificate(s) moved to '{output_folder}'.")
+print(f"✅ Done. {moved_files} certificate(s) moved to '{output_folder}'.")
