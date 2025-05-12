@@ -1,5 +1,7 @@
+# def your_main_function(folder_path , certificate_excel):
 import pytesseract
 from PIL import Image, ImageFilter, ImageOps
+import shutil 
 import os
 import re
 import csv
@@ -8,8 +10,14 @@ import csv
 # This is the mail file 
 
 certificate_excel = "./icmai_certificate_data.csv"     #Path to original excel sheet .
+# name , email , secret  , course , unique_number , reg_no , date , type , duration
 
 folder_path = "./certificates"   # Update this to your certificate folder path
+
+output_folder = "./manual_check_needed"
+
+# Create output folder if it doesn't exist
+os.makedirs(output_folder, exist_ok=True)
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Windows path
 
@@ -53,7 +61,7 @@ def process_folder(folder_path, output_file="output.txt"):
                 i  = i + 1 
                 print('Processed file' , filename  , i)
                 # writer.writerow(["Filename", "Name", "Reg No"])
-          
+        
     print(f" Done! Output written to {output_file}")
 
 
@@ -180,44 +188,88 @@ print("Done. All  Mismatched rows written to error.txt.")
 
 
 import pandas as pd
+from itertools import zip_longest
 
-# Load the CSV files
+# Load the CSV or TXT files
 df1 = pd.read_csv('output2.txt')
 df2 = pd.read_csv('error.txt')
 
-# Extract the specific columns you want
-col1 = df1['unique_number']
-col2 = df2['unique_number']
+col1 = df1['unique_number'].dropna().tolist()
+col2 = df2['unique_number'].dropna().tolist()
 
-# Combine them into a new DataFrame
-new_df = pd.DataFrame({
-    'column_A': col1,
-    'column_B': col2
-})
+# Interleave using zip_longest (fills shorter column with None)
+interleaved = [val for pair in zip_longest(col1, col2) for val in pair if val is not None]
 
-# Save to a new CSV file
+# Create DataFrame
+new_df = pd.DataFrame({'combined_column': interleaved})
+
+# Save to CSV
 new_df.to_csv('merged_output.csv', index=False)
+
 
 
 
 
 # =================================== If you want to delete the intermediate files , then you can uncomment this below code ================================
 
-import os
+# import os
 
-# File paths
-file1 = 'output2.txt'
-file2 = 'error.txt'
+# # File paths
+# file1 = 'output2.txt'
+# file2 = 'error.txt'
 
-# Delete the files
-os.remove(file1)
-os.remove(file2)
+# # Delete the files
+# os.remove(file1)
+# os.remove(file2)
 
-print(f"Deleted {file1} and {file2}  after doing all the processing , and now you have merged_output.csv  which contains , all the unique_numbers , of the mismatched or not matched rows , from the original csv file .")
-
-
+# print(f"Deleted {file1} and {file2}  after doing all the processing , and now you have merged_output.csv  which contains , all the unique_numbers , of the mismatched or not matched rows , from the original csv file .")
 
 
 
+# till now , we have matched the regex in the certificate
+#then make the matched output regex in the output.txt file i.e csv file .
+# then removing the noise of the data to make it clean so we can use it properly . 
+# then we are filtering the NOT FOUND in the regex output.txt file , and then adding it to output2.txt file i.e is also csv file .
+# then we are comparing the output.txt after the duplicates and noise removed , we are comparing it with the original csv file , and then we are adding the mismatched or not matched rows and then we are pushing the incorrect entries in the error.txt file  , i.e also csv file . 
+#then we are fething the unique numbers of both the output2.txt and error.txt files . 
+#then we do have an option to delete the intermediate files( output2.txt  , or error.txt) , if you want to delete them , then you can uncomment the below code .
 
 
+
+# =======================================
+            #  NOW WE WANT THAT ALL THE FILES WITH THE NAME OF UNIQUE NAME WIL LBE MOVED TO THE OUTPUT FOLDER , SO WE CAN SORT THEM MANUALLY . 
+            # ==============================================================================
+
+
+# Step 1: Extract unique IDs from the file (comma-separated text, all as one string)
+unique_ids = set()
+
+with open("merged_output.csv", "r") as file:
+    content = file.read()
+
+for item in content.split(','):
+
+    cleaned = item.strip()
+    if cleaned:
+        unique_ids.add(cleaned.lower())
+
+# Step 2: Prepare destination folder
+os.makedirs(output_folder, exist_ok=True)
+
+# Step 3: Match and move files
+moved_files = 0
+
+for filename in os.listdir(folder_path):
+    filepath = os.path.join(folder_path, filename)
+    if not os.path.isfile(filepath) or not filename.lower().endswith(".jpg"):
+        continue
+
+    name_without_ext = os.path.splitext(filename)[0].strip().lower()
+
+    if name_without_ext in unique_ids:
+        dst = os.path.join(output_folder, filename)
+        if not os.path.exists(dst):
+            shutil.move(filepath, dst)
+            moved_files += 1
+
+print(f" Done. {moved_files} certificate(s) moved to '{output_folder}'.")

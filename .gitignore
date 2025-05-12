@@ -4,3 +4,6 @@ file.ipynb
 venv
 *.txt
 file.ipynb
+app.py
+.gitignore
+!requirements.txt
