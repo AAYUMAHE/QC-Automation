@@ -157,57 +157,59 @@ print(f"Removed them from output.txt, remaining: {len(df_cleaned)} rows")
 #to check the output and all . 
 
 import pandas as pd
+import csv
+import re
 
-# Load the CSV files
-file1 = pd.read_csv("output.txt", header=None)   #output.txt file  . 
-file2 = pd.read_csv(certificate_excel, header=None)    #excel that we have to match with .
+ocr_file = "output.txt"
+# certificate_excel = "actual_file.csv"  # Update with your real file
 
-# Print the shapes for debug
-print("File1 shape:", file1.shape  , "Output.txt file dimensions")
-print("File2 shape:", file2.shape , "Actual Excel file dimensions")
+# Load the files
+file1 = pd.read_csv(ocr_file, header=None)           # OCR output
+file2 = pd.read_csv(certificate_excel, header=None)  # Actual reference
 
-# Check if the files have the expected number of columns
+print("File1 shape:", file1.shape, "- OCR'd output")
+print("File2 shape:", file2.shape, "- Actual certificate file")
+
+# Validation
 if file1.shape[1] < 3 or file2.shape[1] < 9:
     raise ValueError("One of the files does not have the required number of columns.")
 
-# Strip whitespaces from relevant columns in both files
-file1[0] = file1[0].astype(str).str.strip()  # unique_number
-file1[1] = file1[1].astype(str).str.strip()  # name
-file1[2] = file1[2].astype(str).str.strip()  # reg_no
+# Name normalization
+def normalize_name(name):
+    return re.sub(r'\s+', ' ', str(name).strip().lower())
 
-file2[0] = file2[0].astype(str).str.strip()  # name
-file2[4] = file2[4].astype(str).str.strip()  # unique_number
-file2[5] = file2[5].astype(str).str.strip()  # reg_no
+# Reg no normalization (remove leading zeros)
+def normalize_reg_no(reg_no):
+    return str(reg_no).strip().lstrip("0").lower()
 
-# List to store rows with mismatches
+# Apply normalization
+file1[1] = file1[1].apply(normalize_name)     # name
+file1[2] = file1[2].apply(normalize_reg_no)   # reg_no
+
+file2[0] = file2[0].apply(normalize_name)     # name
+file2[5] = file2[5].apply(normalize_reg_no)   # reg_no
+
+# Store unmatched rows
 error_rows = []
 
-# Iterate through each row in file2
-for index, row in file2.iterrows():
-    # Match file2[unique_number] (column 5) with file1[unique_number] (column 1)
-    match_rows = file1[file1[0] == row[4]]
-    
-    if not match_rows.empty:
-        # For each match found, check name and reg_no
-        for _, match_row in match_rows.iterrows():
-            condition1 = match_row[1].strip() == row[0].strip()  # file1[name] == file2[name]
-            condition2 = match_row[2].strip() == row[5].strip()  # file1[reg_no] == file2[reg_no]
-            
-            # If either condition fails, add the row to error_rows
-            if not (condition1 and condition2):
-                error_rows.append(row.tolist())
-    else:
-        # If no match found for unique_number, add the row to error_rows
+for _, row in file2.iterrows():
+    name = row[0]
+    reg_no = row[5]
+
+    match_found = not file1[(file1[1] == name) & (file1[2] == reg_no)].empty
+
+    if not match_found:
         error_rows.append(row.tolist())
 
-# Write mismatched rows to error.txt
-with open("error.txt", "w") as f:
+# Save to error.txt
+with open("error.txt", "w", newline='') as f:
     writer = csv.writer(f)
-    writer.writerow(["name", "email" , "code" , "course" ,"unique_number",  "reg_no" , "date" , "type" , "duration"])
-    for err in error_rows:
-        f.write(",".join(map(str, err)) + "\n")
+    writer.writerow(["name", "email", "code", "course", "unique_number", "reg_no", "date", "type", "duration"])
+    writer.writerows(error_rows)
 
-print("Done. All  Mismatched rows written to error.txt.")
+print(f"✅ Done. Mismatched rows (after cleaning): {len(error_rows)}")
+
+
 
 
 
